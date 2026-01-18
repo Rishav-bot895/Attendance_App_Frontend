@@ -41,3 +41,10 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore assets folder
+assets/
+
