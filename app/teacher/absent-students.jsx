@@ -12,8 +12,6 @@ import { useAuth } from "../../context/AuthContext";
 import { BASE_URL } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
 
-// 🔥 ADD THIS IMPORT
-import BleAdvertiser from "react-native-ble-advertiser";
 
 export default function AbsentStudentsScreen() {
   const { activeSessionId, clearSession } = useAuth();

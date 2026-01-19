@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { BASE_URL } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
-import BleAdvertiser from "react-native-ble-advertiser";
 
 export default function StartAttendanceScreen() {
   const { user, setSession } = useAuth();
