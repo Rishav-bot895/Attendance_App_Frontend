@@ -20,6 +20,13 @@ export default function AdminDashboard() {
       >
         <Text style={styles.buttonText}>Assign Schedule</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, styles.disabledButton]} 
+        activeOpacity={1} 
+        onPress={null}  
+      >
+        <Text style={styles.disabledButtonText}>Delete User (Later)</Text>
+      </TouchableOpacity>
     </View>
   );
 }

@@ -1,110 +1,69 @@
-import { useEffect, useRef, useState } from "react";
-import { Platform, PermissionsAndroid, Alert } from "react-native";
+import { useEffect, useState } from "react";
+import { Platform, PermissionsAndroid } from "react-native";
 import { BleManager } from "react-native-ble-plx";
 
+const manager = new BleManager();
+
+// RSSI threshold (tune if needed)
+const RSSI_THRESHOLD = -72;
+
+
 export function useBle() {
-  const managerRef = useRef(null);
-
-  const [scanning, setScanning] = useState(false);
   const [nearby, setNearby] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  // -----------------------------
-  // INIT BLE MANAGER
-  // -----------------------------
   useEffect(() => {
-    managerRef.current = new BleManager();
-
     return () => {
-      managerRef.current?.destroy();
+      manager.stopDeviceScan();
+      manager.destroy();
     };
   }, []);
 
-  // -----------------------------
-  // PERMISSIONS (ANDROID)
-  // -----------------------------
   const requestPermissions = async () => {
-    if (Platform.OS !== "android") return true;
+    if (Platform.OS === "android") {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]);
 
-    try {
-      const permissions = [];
+      return Object.values(granted).every(
+        (s) => s === PermissionsAndroid.RESULTS.GRANTED
+      );
+    }
+    return true;
+  };
 
-      if (Platform.Version >= 31) {
-        permissions.push(
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
-        );
+  const startScan = async () => {
+    const ok = await requestPermissions();
+    if (!ok) return;
+
+    setNearby(false);
+    setScanning(true);
+
+    manager.startDeviceScan(null, null, (error, device) => {
+      if (error) {
+        console.log("BLE scan error:", error);
+        return;
       }
 
-      permissions.push(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
-
-      const results = await PermissionsAndroid.requestMultiple(permissions);
-
-      return permissions.every(
-        (p) => results[p] === PermissionsAndroid.RESULTS.GRANTED
-      );
-    } catch (err) {
-      console.log("Permission error:", err);
-      return false;
-    }
-  };
-
-  // -----------------------------
-  // START SCAN
-  // -----------------------------
-  const startScan = async () => {
-    if (!managerRef.current || scanning) return;
-
-    const granted = await requestPermissions();
-    if (!granted) {
-      Alert.alert(
-        "Permission Required",
-        "Bluetooth and Location permissions are required to scan for teachers."
-      );
-      return;
-    }
-
-    setScanning(true);
-    setNearby(false);
-
-    try {
-      managerRef.current.startDeviceScan(
-        null,
-        { allowDuplicates: false },
-        (error, device) => {
-          if (error) {
-            console.log("BLE scan error:", error.message);
-            stopScan();
-            return;
-          }
-
-          // 🔵 SIMPLE PROXIMITY LOGIC (unchanged behavior)
-          if (device && device.rssi !== null && device.rssi > -65) {
-            setNearby(true);
-            stopScan();
-          }
+      // 🔥 RSSI-based proximity check
+      if (device?.rssi !== null && device?.rssi !== undefined) {
+        if (device.rssi > RSSI_THRESHOLD) {
+          setNearby(true);
         }
-      );
-    } catch (err) {
-      console.log("BLE fatal error:", err);
-      stopScan();
-    }
-  };
+      }
+    });
 
-  // -----------------------------
-  // STOP SCAN
-  // -----------------------------
-  const stopScan = () => {
-    if (managerRef.current) {
-      managerRef.current.stopDeviceScan();
-    }
-    setScanning(false);
+    // Stop scan after 6 seconds
+    setTimeout(() => {
+      manager.stopDeviceScan();
+      setScanning(false);
+    }, 6000);
   };
 
   return {
-    scanning,
     nearby,
+    scanning,
     startScan,
   };
 }

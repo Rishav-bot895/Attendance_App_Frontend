@@ -43,7 +43,7 @@ export default function CreateUserScreen() {
         return;
       }
 
-      Alert.alert("Success", data.message, [
+      Alert.alert("Success", data.message || "User created successfully",[
         { text: "OK", onPress: () => router.back() },
       ]);
 
