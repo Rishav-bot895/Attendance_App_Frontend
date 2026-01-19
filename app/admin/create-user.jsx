@@ -5,17 +5,18 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useServer } from "../../context/ServerContext";
+import { BASE_URL } from "../../constants/api";
+import { COLORS } from "../../constants/theme";
 
 export default function CreateUserScreen() {
-  const { serverIp } = useServer();
-  const BASE_URL = `https://attendance-app-backend-p9ce.onrender.com`;
-
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("student");
@@ -29,7 +30,6 @@ export default function CreateUserScreen() {
     }
 
     setLoading(true);
-
     try {
       const res = await fetch(`${BASE_URL}/admin/create-user`, {
         method: "POST",
@@ -38,7 +38,6 @@ export default function CreateUserScreen() {
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         Alert.alert("Error", data.message || "Failed to create user");
         return;
@@ -59,143 +58,145 @@ export default function CreateUserScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create User</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: COLORS.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Create User</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        autoCapitalize="none"
-        onChangeText={setUsername}
-      />
-
-      <View style={styles.passwordContainer}>
         <TextInput
-          style={styles.passwordInput}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor={COLORS.muted}
+          value={username}
+          autoCapitalize="none"
+          onChangeText={setUsername}
         />
 
-        <TouchableOpacity
-          style={styles.eyeIcon}
-          onPress={() => setShowPassword(!showPassword)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name={showPassword ? "eye-off" : "eye"}
-            size={22}
-            color="#555"
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={COLORS.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
           />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.roleRow}>
-        {["student", "teacher"].map((r) => (
           <TouchableOpacity
-            key={r}
-            style={[styles.roleBtn, role === r && styles.roleActive]}
-            onPress={() => setRole(r)}
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
           >
-            <Text
-              style={[
-                styles.roleText,
-                role === r && styles.roleTextActive,
-              ]}
-            >
-              {r}
-            </Text>
+            <Ionicons
+              name={showPassword ? "eye-off" : "eye"}
+              size={22}
+              color={COLORS.muted}
+            />
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleCreateUser}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Creating..." : "Create User"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        {/* ROLE SELECTION (RESTORED) */}
+        <View style={styles.roleRow}>
+          {["student", "teacher"].map((r) => (
+            <TouchableOpacity
+              key={r}
+              style={[
+                styles.roleButton,
+                role === r && styles.roleActive,
+              ]}
+              onPress={() => setRole(r)}
+            >
+              <Text
+                style={[
+                  styles.roleText,
+                  role === r && styles.roleTextActive,
+                ]}
+              >
+                {r.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleCreateUser}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Creating..." : "Create User"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 24,
+    flexGrow: 1,
     justifyContent: "center",
+    padding: 24,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "600",
+    fontSize: 24,
+    color: COLORS.text,
     textAlign: "center",
     marginBottom: 24,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.text,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 16,
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   passwordContainer: {
     position: "relative",
-    marginBottom: 16,
-  },
-  passwordInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 14,
-    paddingRight: 44,
-    fontSize: 16,
   },
   eyeIcon: {
     position: "absolute",
     right: 14,
-    top: "50%",
-    transform: [{ translateY: -11 }],
-    zIndex: 10,      // ✅ Android fix
-    elevation: 10,   // ✅ Android fix
+    top: 14,
   },
   roleRow: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  roleBtn: {
+  roleButton: {
     borderWidth: 1,
-    borderColor: "#1e90ff",
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginHorizontal: 6,
+    borderColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginHorizontal: 8,
   },
   roleActive: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
   },
   roleText: {
-    color: "#000",
-  },
-  roleTextActive: {
-    color: "#fff",
+    color: COLORS.text,
     fontWeight: "500",
   },
+  roleTextActive: {
+    color: "#000",
+    fontWeight: "600",
+  },
   button: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
   },
   buttonText: {
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });

@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { router } from "expo-router";
+import { COLORS } from "../../constants/theme";
 
 export default function AdminDashboard() {
   return (
@@ -17,11 +18,7 @@ export default function AdminDashboard() {
         style={styles.button}
         onPress={() => router.push("/admin/assign-schedule")}
       >
-        <Text style={styles.buttonText}>Assign Teacher Schedule</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.buttonDisabled}>
-        <Text style={styles.buttonText}>Delete User (Later)</Text>
+        <Text style={styles.buttonText}>Assign Schedule</Text>
       </TouchableOpacity>
     </View>
   );
@@ -30,32 +27,26 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
+    backgroundColor: COLORS.bg,
     justifyContent: "center",
+    padding: 24,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "600",
+    fontSize: 24,
+    color: COLORS.text,
     textAlign: "center",
     marginBottom: 32,
   },
   button: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    backgroundColor: "#aaa",
-    paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     alignItems: "center",
   },
   buttonText: {
-    color: "#fff",
+    color: "#000",
+    fontWeight: "600",
     fontSize: 16,
-    fontWeight: "500",
   },
 });

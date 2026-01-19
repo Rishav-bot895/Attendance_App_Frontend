@@ -5,13 +5,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-
 import { useAuth } from "../context/AuthContext";
 import { BASE_URL } from "../constants/api";
+import { COLORS } from "../constants/theme";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -29,7 +32,6 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-
     try {
       const res = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
@@ -38,7 +40,6 @@ export default function LoginScreen() {
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         Alert.alert("Error", data.message || "Login failed");
         return;
@@ -50,77 +51,113 @@ export default function LoginScreen() {
       else if (role === "teacher") router.replace("/teacher");
       else router.replace("/student");
     } catch {
-      Alert.alert("Network Error", "Unable to connect to server");
+      Alert.alert("Network Error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Login ({role})</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        autoCapitalize="none"
-        onChangeText={setUsername}
-      />
-
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-        />
-        <TouchableOpacity
-          style={styles.eyeIcon}
-          onPress={() => setShowPassword(!showPassword)}
-        >
-          <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleLogin}
-        disabled={loading}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: COLORS.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Logging in..." : "Login"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.title}>Login ({role})</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor={COLORS.muted}
+          value={username}
+          onChangeText={setUsername}
+        />
+
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor={COLORS.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off" : "eye"}
+              size={22}
+              color={COLORS.muted}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Logging in..." : "Login"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: "center" },
-  title: { fontSize: 22, textAlign: "center", marginBottom: 24 },
+  container: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  title: {
+    fontSize: 24,
+    color: COLORS.text,
+    textAlign: "center",
+    marginBottom: 32,
+  },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.text,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 16,
-  },
-  passwordContainer: { position: "relative", marginBottom: 16 },
-  passwordInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 14,
-    paddingRight: 44,
+    borderColor: COLORS.border,
   },
-  eyeIcon: { position: "absolute", right: 14, top: "50%" },
+  passwordContainer: {
+    position: "relative",
+    marginBottom: 24,
+  },
+  passwordInput: {
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.text,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  eyeIcon: {
+    position: "absolute",
+    right: 14,
+    top: 14,
+  },
   button: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontSize: 16 },
+  buttonText: {
+    color: "#000",
+    fontWeight: "600",
+    fontSize: 16,
+  },
 });

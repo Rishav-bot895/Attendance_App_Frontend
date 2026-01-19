@@ -1,38 +1,25 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { router } from "expo-router";
+import { COLORS } from "../constants/theme";
 
 export default function RoleSelectScreen() {
   const goToLogin = (role) => {
-    router.push({
-      pathname: "/login",
-      params: { role },
-    });
+    router.push({ pathname: "/login", params: { role } });
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select Your Role</Text>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => goToLogin("student")}
-      >
-        <Text style={styles.buttonText}>Student</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => goToLogin("teacher")}
-      >
-        <Text style={styles.buttonText}>Teacher</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => goToLogin("admin")}
-      >
-        <Text style={styles.buttonText}>Admin</Text>
-      </TouchableOpacity>
+      {["student", "teacher", "admin"].map((r) => (
+        <TouchableOpacity
+          key={r}
+          style={styles.button}
+          onPress={() => goToLogin(r)}
+        >
+          <Text style={styles.buttonText}>{r.toUpperCase()}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
@@ -40,26 +27,27 @@ export default function RoleSelectScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.bg,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "600",
+    fontSize: 26,
+    color: COLORS.text,
     marginBottom: 32,
   },
   button: {
     width: "80%",
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    backgroundColor: "#1e90ff",
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     alignItems: "center",
   },
   buttonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "500",
+    color: "#000",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

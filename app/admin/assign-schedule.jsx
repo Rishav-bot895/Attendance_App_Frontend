@@ -5,11 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 
-import { useServer } from "../../context/ServerContext"; // ✅ FIXED PATH
+import { BASE_URL } from "../../constants/api";
+import { COLORS } from "../../constants/theme";
 
 const DAYS = [
   "Monday",
@@ -18,14 +22,9 @@ const DAYS = [
   "Thursday",
   "Friday",
   "Saturday",
-  "Sunday",
 ];
 
 export default function AssignScheduleScreen() {
-  // ✅ Hook moved INSIDE component (required by React)
-  const { serverIp } = useServer();
-  const BASE_URL = `https://attendance-app-backend-p9ce.onrender.com`;
-
   const [teacherUsername, setTeacherUsername] = useState("");
   const [day, setDay] = useState("Monday");
   const [startTime, setStartTime] = useState("");
@@ -39,7 +38,6 @@ export default function AssignScheduleScreen() {
     }
 
     setLoading(true);
-
     try {
       const response = await fetch(`${BASE_URL}/admin/assign-schedule`, {
         method: "POST",
@@ -53,7 +51,6 @@ export default function AssignScheduleScreen() {
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         Alert.alert("Error", data.message || "Failed to assign schedule");
         return;
@@ -67,7 +64,7 @@ export default function AssignScheduleScreen() {
       setStartTime("");
       setEndTime("");
       setDay("Monday");
-    } catch (err) {
+    } catch {
       Alert.alert("Network Error", "Unable to connect to server");
     } finally {
       setLoading(false);
@@ -75,88 +72,105 @@ export default function AssignScheduleScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Assign Teacher Schedule</Text>
-
-      <Text style={styles.label}>Teacher Username</Text>
-      <TextInput
-        style={styles.input}
-        value={teacherUsername}
-        onChangeText={setTeacherUsername}
-        autoCapitalize="none"
-        placeholder="Enter teacher username"
-      />
-
-      <Text style={styles.label}>Day</Text>
-      <View style={styles.dayRow}>
-        {DAYS.map((d) => (
-          <TouchableOpacity
-            key={d}
-            style={[styles.dayButton, day === d && styles.dayButtonActive]}
-            onPress={() => setDay(d)}
-          >
-            <Text
-              style={[styles.dayText, day === d && styles.dayTextActive]}
-            >
-              {d}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Start Time (HH:MM)</Text>
-      <TextInput
-        style={styles.input}
-        value={startTime}
-        onChangeText={setStartTime}
-        placeholder="10:00"
-      />
-
-      <Text style={styles.label}>End Time (HH:MM)</Text>
-      <TextInput
-        style={styles.input}
-        value={endTime}
-        onChangeText={setEndTime}
-        placeholder="11:00"
-      />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleAssignSchedule}
-        disabled={loading}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: COLORS.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Assigning..." : "Assign Schedule"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.title}>Assign Teacher Schedule</Text>
+
+        <Text style={styles.label}>Teacher Username</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter teacher username"
+          placeholderTextColor={COLORS.muted}
+          value={teacherUsername}
+          autoCapitalize="none"
+          onChangeText={setTeacherUsername}
+        />
+
+        <Text style={styles.label}>Day</Text>
+        <View style={styles.dayRow}>
+          {DAYS.map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[
+                styles.dayButton,
+                day === d && styles.dayButtonActive,
+              ]}
+              onPress={() => setDay(d)}
+            >
+              <Text
+                style={[
+                  styles.dayText,
+                  day === d && styles.dayTextActive,
+                ]}
+              >
+                {d}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Start Time (HH:MM)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="10:00"
+          placeholderTextColor={COLORS.muted}
+          value={startTime}
+          onChangeText={setStartTime}
+        />
+
+        <Text style={styles.label}>End Time (HH:MM)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="11:00"
+          placeholderTextColor={COLORS.muted}
+          value={endTime}
+          onChangeText={setEndTime}
+        />
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleAssignSchedule}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Assigning..." : "Assign Schedule"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
     justifyContent: "center",
   },
   title: {
-    fontSize: 22,
-    fontWeight: "600",
+    fontSize: 24,
+    color: COLORS.text,
     textAlign: "center",
     marginBottom: 24,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "500",
+    color: COLORS.muted,
     marginBottom: 6,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.text,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 16,
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   dayRow: {
     flexDirection: "row",
@@ -165,33 +179,34 @@ const styles = StyleSheet.create({
   },
   dayButton: {
     borderWidth: 1,
-    borderColor: "#1e90ff",
-    borderRadius: 6,
+    borderColor: COLORS.primary,
+    borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginRight: 8,
     marginBottom: 8,
   },
   dayButtonActive: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
   },
   dayText: {
+    color: COLORS.text,
     fontSize: 13,
-    color: "#000",
   },
   dayTextActive: {
-    color: "#fff",
-    fontWeight: "500",
+    color: "#000",
+    fontWeight: "600",
   },
   button: {
-    backgroundColor: "#1e90ff",
+    backgroundColor: COLORS.primary,
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
+    marginTop: 8,
   },
   buttonText: {
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });
