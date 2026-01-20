@@ -2,16 +2,19 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useBleAdvertiser } from "../../hooks/useBleAdvertiser";
 import { BASE_URL } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
 
 export default function StartAttendanceScreen() {
   const { user, setSession } = useAuth();
+  const { startAdvertising } = useBleAdvertiser();
   const [loading, setLoading] = useState(false);
 
   const start = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
+
       const r = await fetch(`${BASE_URL}/teacher/start-attendance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -19,27 +22,25 @@ export default function StartAttendanceScreen() {
       });
 
       const d = await r.json();
+
       if (!r.ok) {
-        Alert.alert("Error", d.message);
+        Alert.alert("Error", d.message || "Unable to start attendance");
         return;
       }
 
-      // 🔥 START BLE ADVERTISING USING TEACHER UUID
-      await BleAdvertiser.broadcast(
-        user.beacon_id,
-        [],
-        {
-          advertiseMode: BleAdvertiser.ADVERTISE_MODE_LOW_LATENCY,
-          txPowerLevel: BleAdvertiser.ADVERTISE_TX_POWER_HIGH,
-          connectable: false,
-        }
-      );
+      // MODIFICATION: Pass the session_id instead of username
+      // session_id is short (e.g., "101") so it fits in the BLE packet
+      const bleStarted = await startAdvertising(d.session_id);
+      
+      if (!bleStarted) {
+        Alert.alert("Warning", "BLE advertising failed. Students may not detect you.");
+      }
 
-      await setSession(d.session_id);
+      setSession(d.session_id);
       router.replace("/teacher/absent-students");
     } catch (e) {
+      console.log("Start attendance error:", e);
       Alert.alert("Error", "Failed to start attendance");
-      console.log(e);
     } finally {
       setLoading(false);
     }
@@ -48,7 +49,12 @@ export default function StartAttendanceScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Start Attendance</Text>
-      <TouchableOpacity style={styles.button} onPress={start} disabled={loading}>
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={start}
+        disabled={loading}
+      >
         <Text style={styles.text}>
           {loading ? "Starting..." : "Start Attendance"}
         </Text>
@@ -58,8 +64,26 @@ export default function StartAttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg, justifyContent: "center", padding: 24 },
-  title: { color: COLORS.text, fontSize: 22, textAlign: "center", marginBottom: 32 },
-  button: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12 },
-  text: { textAlign: "center", fontWeight: "600", color: "#000" },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+    justifyContent: "center",
+    padding: 24,
+  },
+  title: {
+    color: COLORS.text,
+    fontSize: 22,
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  button: {
+    backgroundColor: COLORS.primary,
+    padding: 16,
+    borderRadius: 12,
+  },
+  text: {
+    textAlign: "center",
+    fontWeight: "600",
+    color: "#000",
+  },
 });

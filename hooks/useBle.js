@@ -3,14 +3,40 @@ import { Platform, PermissionsAndroid } from "react-native";
 import { BleManager } from "react-native-ble-plx";
 
 const manager = new BleManager();
+const SERVICE_UUID = "12345678-1234-1234-1234-123456789ABC";
 
-// RSSI threshold (tune if needed)
-const RSSI_THRESHOLD = -72;
+// Helper: Decode Base64 to String without external libraries
+function decodeManufacturerData(base64) {
+  try {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = base64.replace(/=+$/, '');
+    let output = '';
 
+    if (str.length % 4 == 1) {
+      throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
+    }
+    for (let bc = 0, bs = 0, buffer, i = 0;
+      buffer = str.charAt(i++);
+
+      ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
+        bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
+    ) {
+      buffer = chars.indexOf(buffer);
+    }
+
+    // The first 2 bytes are Company ID. We slice them off.
+    // However, the raw string above might look like garbage characters for the first 2 chars.
+    // We just take the substring from index 2.
+    return output.substring(2);
+  } catch (e) {
+    console.log("Decode error:", e);
+    return null;
+  }
+}
 
 export function useBle() {
-  const [nearby, setNearby] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [foundSessionIds, setFoundSessionIds] = useState([]);
 
   useEffect(() => {
     return () => {
@@ -25,7 +51,6 @@ export function useBle() {
         PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       ]);
-
       return Object.values(granted).every(
         (s) => s === PermissionsAndroid.RESULTS.GRANTED
       );
@@ -37,33 +62,49 @@ export function useBle() {
     const ok = await requestPermissions();
     if (!ok) return;
 
-    setNearby(false);
+    setFoundSessionIds([]); 
     setScanning(true);
+    console.log("Starting BLE Scan...");
 
-    manager.startDeviceScan(null, null, (error, device) => {
+    manager.startDeviceScan(null, { allowDuplicates: true }, (error, device) => {
       if (error) {
-        console.log("BLE scan error:", error);
+        // console.log("Scan error:", error); 
         return;
       }
 
-      // 🔥 RSSI-based proximity check
-      if (device?.rssi !== null && device?.rssi !== undefined) {
-        if (device.rssi > RSSI_THRESHOLD) {
-          setNearby(true);
+      // Check for Service UUID
+      if (device?.serviceUUIDs?.includes(SERVICE_UUID)) {
+        
+        // If we have manufacturer data, try to decode the Session ID
+        if (device.manufacturerData) {
+            const detectedId = decodeManufacturerData(device.manufacturerData);
+            
+            // Clean up any null bytes or whitespace
+            const cleanId = detectedId ? detectedId.replace(/\0/g, '').trim() : null;
+
+            if (cleanId) {
+                console.log("Raw ManData:", device.manufacturerData, "Decoded:", cleanId);
+                
+                setFoundSessionIds((prev) => {
+                    if (prev.includes(cleanId)) return prev;
+                    return [...prev, cleanId];
+                });
+            }
         }
       }
     });
 
-    // Stop scan after 6 seconds
+    // Scan for 5 seconds
     setTimeout(() => {
       manager.stopDeviceScan();
       setScanning(false);
-    }, 6000);
+      console.log("Scan stopped");
+    }, 5000);
   };
 
   return {
-    nearby,
     scanning,
+    foundSessionIds,
     startScan,
   };
 }

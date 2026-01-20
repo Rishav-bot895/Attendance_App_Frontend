@@ -9,12 +9,13 @@ import {
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useBleAdvertiser } from "../../hooks/useBleAdvertiser";
 import { BASE_URL } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
 
-
 export default function AbsentStudentsScreen() {
   const { activeSessionId, clearSession } = useAuth();
+  const { stopAdvertising } = useBleAdvertiser();
   const [absentees, setAbsentees] = useState([]);
 
   const loadAbsentees = async () => {
@@ -50,8 +51,8 @@ export default function AbsentStudentsScreen() {
 
   const closeAttendance = async () => {
     try {
-      // 🔥 STOP BLE ADVERTISING
-      await BleAdvertiser.stopBroadcast();
+      // Stop BLE advertising
+      await stopAdvertising();
     } catch (e) {
       console.log("BLE stop error:", e);
     }
