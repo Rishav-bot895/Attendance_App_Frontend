@@ -146,7 +146,9 @@ export default function ActiveTeachersScreen() {
           const isMarked = markedSessions.has(item.session_id);
           const apiSessionId = String(item.session_id).trim();
           const isNearby = foundSessionIds.includes(apiSessionId);
-          const canMark = (isNearby || true) && !isMarked; // Allow manual marking always
+          
+          // Only allow marking if: 1) Nearby via BLE OR 2) Already marked
+          const canMark = isNearby && !isMarked;
 
           if (item === teachers[0])
             fetch(DEBUG_LOG_INGEST, {
@@ -167,7 +169,6 @@ export default function ActiveTeachersScreen() {
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.teacherName}>{item.teacher_name}</Text>
-                  <Text style={styles.sessionIdText}>ID: {item.session_id}</Text>
                   <Text style={styles.scheduleText}>
                     {item.day} • {item.start_time} - {item.end_time}
                   </Text>
@@ -180,24 +181,30 @@ export default function ActiveTeachersScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[styles.button, !canMark && styles.disabled]}
-                disabled={!canMark}
-                onPress={() => markAttendance(item.session_id)}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    !canMark && styles.disabledText,
-                  ]}
+              {/* Only show button if nearby OR already marked */}
+              {(isNearby || isMarked) && (
+                <TouchableOpacity
+                  style={[styles.button, !canMark && styles.disabled]}
+                  disabled={!canMark}
+                  onPress={() => markAttendance(item.session_id)}
                 >
-                  {isMarked
-                    ? "✓ Already Marked"
-                    : isNearby
-                    ? "Mark Attendance (BLE)"
-                    : "Mark Attendance (Manual)"}
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      !canMark && styles.disabledText,
+                    ]}
+                  >
+                    {isMarked ? "✓ Already Marked" : "Mark Attendance"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              {/* Show helpful message if not nearby and not marked */}
+              {!isNearby && !isMarked && (
+                <Text style={styles.hintText}>
+                  Scan to detect teacher or use Manual Entry
                 </Text>
-              </TouchableOpacity>
+              )}
             </View>
           );
         }}
@@ -222,7 +229,7 @@ export default function ActiveTeachersScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Enter Session ID</Text>
             <Text style={styles.modalSubtitle}>
-              Get the session code from your teacher
+              Ask your teacher for the session code
             </Text>
 
             <TextInput
@@ -324,12 +331,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
   },
-  sessionIdText: {
-    color: COLORS.muted,
-    fontSize: 12,
-    fontFamily: "monospace",
-    marginBottom: 2,
-  },
   scheduleText: {
     color: COLORS.muted,
     fontSize: 11,
@@ -360,6 +361,13 @@ const styles = StyleSheet.create({
   disabled: { backgroundColor: COLORS.border },
   buttonText: { color: "#000", textAlign: "center", fontWeight: "600" },
   disabledText: { color: COLORS.muted },
+  hintText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 12,
+    fontStyle: "italic",
+  },
   emptyContainer: {
     justifyContent: "center",
     alignItems: "center",
