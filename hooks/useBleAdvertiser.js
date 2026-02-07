@@ -1,5 +1,6 @@
-import { Platform, PermissionsAndroid, Alert } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 import BleAdvertiser from "react-native-ble-advertiser";
+import { DEBUG_LOG_INGEST } from "../constants/api";
 
 const SERVICE_UUID = "12345678-1234-1234-1234-123456789ABC";
 
@@ -47,6 +48,9 @@ export function useBleAdvertiser() {
       for (let i = 0; i < idString.length; i++) {
         payload.push(idString.charCodeAt(i));
       }
+      // #region agent log
+      fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBleAdvertiser.js:startAdvertising',message:'Advertiser payload',data:{sessionId, idString, payload},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
 
       BleAdvertiser.setCompanyId(0x00E0); 
       

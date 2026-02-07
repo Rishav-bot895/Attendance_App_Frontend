@@ -1,16 +1,21 @@
+import { useEffect, useState } from "react";
 import {
-  View,
+  Alert,
+  FlatList,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Alert,
+  View,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { BASE_URL, DEBUG_LOG_INGEST } from "../../constants/api";
+import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { useBle } from "../../hooks/useBle";
-import { BASE_URL } from "../../constants/api";
+<<<<<<< Current (Your changes)
+=======
+import { BASE_URL, DEBUG_LOG_INGEST } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
+>>>>>>> Incoming (Background Agent changes)
 
 export default function ActiveTeachersScreen() {
   const { user } = useAuth();
@@ -25,7 +30,13 @@ export default function ActiveTeachersScreen() {
   const loadActiveTeachers = () => {
     fetch(`${BASE_URL}/student/active-teachers`)
       .then((r) => r.json())
-      .then(setTeachers)
+      .then((data) => {
+        setTeachers(data);
+        // #region agent log
+        const sessionIds = (data || []).map((t) => t.session_id);
+        fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'active-teachers.jsx:loadActiveTeachers',message:'API teachers loaded',data:{sessionIds, types: (data || []).map((t) => typeof t.session_id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+      })
       .catch(() => Alert.alert("Error", "Failed to load active classes"));
   };
 
@@ -82,12 +93,15 @@ export default function ActiveTeachersScreen() {
         keyExtractor={(i) => String(i.session_id)}
         renderItem={({ item }) => {
           const isMarked = markedSessions.has(item.session_id);
-          
+
           // ROBUST MATCHING: Convert both to string and trim to be sure
           const apiSessionId = String(item.session_id).trim();
           const isNearby = foundSessionIds.includes(apiSessionId);
-          
+
           const canMark = isNearby && !isMarked;
+          // #region agent log
+          if (item === teachers[0]) fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'active-teachers.jsx:renderItem',message:'First teacher match',data:{apiSessionId, foundSessionIds, isNearby, canMark},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+          // #endregion
 
           return (
             <View style={styles.card}>

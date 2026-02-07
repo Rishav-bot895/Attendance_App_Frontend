@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Platform, PermissionsAndroid } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 import { BleManager } from "react-native-ble-plx";
+import { DEBUG_LOG_INGEST } from "../constants/api";
 
 const manager = new BleManager();
 const SERVICE_UUID = "12345678-1234-1234-1234-123456789ABC";
@@ -62,31 +63,50 @@ export function useBle() {
     const ok = await requestPermissions();
     if (!ok) return;
 
-    setFoundSessionIds([]); 
+    setFoundSessionIds([]);
     setScanning(true);
     console.log("Starting BLE Scan...");
+    // #region agent log
+    fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBle.js:startScan',message:'Scan started',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
 
     manager.startDeviceScan(null, { allowDuplicates: true }, (error, device) => {
       if (error) {
-        // console.log("Scan error:", error); 
+        // #region agent log
+        fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBle.js:scan-callback',message:'Scan error',data:{error: String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
         return;
       }
 
+      // #region agent log
+      const suuids = device?.serviceUUIDs;
+      const hasServiceUuid = Array.isArray(suuids) && suuids.includes(SERVICE_UUID);
+      const hasManData = !!device?.manufacturerData;
+      if (hasManData || (Array.isArray(suuids) && suuids.length > 0)) fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBle.js:device-seen',message:'Device in scan',data:{serviceUUIDs: suuids, hasServiceUuid, hasManData, manDataLen: device?.manufacturerData?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+
       // Check for Service UUID
       if (device?.serviceUUIDs?.includes(SERVICE_UUID)) {
-        
+
         // If we have manufacturer data, try to decode the Session ID
         if (device.manufacturerData) {
             const detectedId = decodeManufacturerData(device.manufacturerData);
-            
+
+            // #region agent log
+            fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBle.js:after-decode',message:'Decode result',data:{rawLen:device.manufacturerData?.length,detectedId,detectedType:typeof detectedId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+            // #endregion
+
             // Clean up any null bytes or whitespace
             const cleanId = detectedId ? detectedId.replace(/\0/g, '').trim() : null;
 
             if (cleanId) {
                 console.log("Raw ManData:", device.manufacturerData, "Decoded:", cleanId);
-                
+
                 setFoundSessionIds((prev) => {
                     if (prev.includes(cleanId)) return prev;
+                    // #region agent log
+                    fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBle.js:add-session',message:'Adding to foundSessionIds',data:{cleanId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+                    // #endregion
                     return [...prev, cleanId];
                 });
             }
