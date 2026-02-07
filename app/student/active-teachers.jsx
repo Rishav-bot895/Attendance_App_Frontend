@@ -4,27 +4,29 @@ import {
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from "react-native";
 import { BASE_URL, DEBUG_LOG_INGEST } from "../../constants/api";
 import { COLORS } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { useBle } from "../../hooks/useBle";
-<<<<<<< Current (Your changes)
-=======
-import { BASE_URL, DEBUG_LOG_INGEST } from "../../constants/api";
-import { COLORS } from "../../constants/theme";
->>>>>>> Incoming (Background Agent changes)
 
 export default function ActiveTeachersScreen() {
   const { user } = useAuth();
   const { foundSessionIds, scanning, startScan } = useBle();
   const [teachers, setTeachers] = useState([]);
   const [markedSessions, setMarkedSessions] = useState(new Set());
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualSessionId, setManualSessionId] = useState("");
 
   useEffect(() => {
     loadActiveTeachers();
+    // Refresh every 10 seconds
+    const interval = setInterval(loadActiveTeachers, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadActiveTeachers = () => {
@@ -32,16 +34,30 @@ export default function ActiveTeachersScreen() {
       .then((r) => r.json())
       .then((data) => {
         setTeachers(data);
-        // #region agent log
-        const sessionIds = (data || []).map((t) => t.session_id);
-        fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'active-teachers.jsx:loadActiveTeachers',message:'API teachers loaded',data:{sessionIds, types: (data || []).map((t) => typeof t.session_id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
+        fetch(DEBUG_LOG_INGEST, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location: "active-teachers.jsx:loadActiveTeachers",
+            message: "API teachers loaded",
+            data: {
+              sessionIds: (data || []).map((t) => t.session_id),
+              types: (data || []).map((t) => typeof t.session_id),
+            },
+            timestamp: Date.now(),
+            sessionId: "debug-session",
+            hypothesisId: "H3",
+          }),
+        }).catch(() => {});
       })
       .catch(() => Alert.alert("Error", "Failed to load active classes"));
   };
 
   const markAttendance = async (sessionId) => {
-    if (markedSessions.has(sessionId)) return;
+    if (markedSessions.has(sessionId)) {
+      Alert.alert("Already Marked", "You've already marked attendance for this session.");
+      return;
+    }
 
     try {
       const r = await fetch(`${BASE_URL}/student/mark-attendance`, {
@@ -60,32 +76,67 @@ export default function ActiveTeachersScreen() {
       }
 
       setMarkedSessions(new Set([...markedSessions, sessionId]));
-      Alert.alert("Success", "Attendance marked successfully");
+      Alert.alert("Success", "Attendance marked successfully!");
       loadActiveTeachers();
     } catch {
-      Alert.alert("Network Error");
+      Alert.alert("Network Error", "Unable to connect to server");
     }
+  };
+
+  const markAttendanceManually = async () => {
+    const sessionId = manualSessionId.trim();
+    
+    if (!sessionId) {
+      Alert.alert("Error", "Please enter a session ID");
+      return;
+    }
+
+    // Check if session exists in active teachers
+    const sessionExists = teachers.some((t) => String(t.session_id) === sessionId);
+    
+    if (!sessionExists) {
+      Alert.alert(
+        "Session Not Found",
+        `Session ${sessionId} is not currently active. Make sure you've entered the correct code.`
+      );
+      return;
+    }
+
+    setShowManualEntry(false);
+    await markAttendance(sessionId);
+    setManualSessionId("");
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Active Classes</Text>
 
-      <TouchableOpacity 
-        style={[styles.scan, scanning && styles.scanActive]} 
-        onPress={startScan}
-        disabled={scanning}
-      >
-        <Text style={styles.scanText}>
-          {scanning ? "Scanning..." : "Scan for Nearby Teachers"}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.scanButton, scanning && styles.scanActive]}
+          onPress={startScan}
+          disabled={scanning}
+        >
+          <Text style={styles.scanText}>
+            {scanning ? "Scanning..." : "🔍 Scan BLE"}
+          </Text>
+        </TouchableOpacity>
 
-      {/* DEBUG VIEW: Show what the phone actually sees */}
+        <TouchableOpacity
+          style={styles.manualButton}
+          onPress={() => setShowManualEntry(true)}
+        >
+          <Text style={styles.manualButtonText}>✏️ Manual Entry</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Debug: Show detected sessions */}
       {foundSessionIds.length > 0 && (
-         <Text style={{textAlign:'center', color:'gray', marginBottom:10}}>
-            Debug: Found Sessions [{foundSessionIds.join(", ")}]
-         </Text>
+        <View style={styles.debugBox}>
+          <Text style={styles.debugText}>
+            📡 Detected: {foundSessionIds.join(", ")}
+          </Text>
+        </View>
       )}
 
       <FlatList
@@ -93,54 +144,300 @@ export default function ActiveTeachersScreen() {
         keyExtractor={(i) => String(i.session_id)}
         renderItem={({ item }) => {
           const isMarked = markedSessions.has(item.session_id);
-
-          // ROBUST MATCHING: Convert both to string and trim to be sure
           const apiSessionId = String(item.session_id).trim();
           const isNearby = foundSessionIds.includes(apiSessionId);
+          const canMark = (isNearby || true) && !isMarked; // Allow manual marking always
 
-          const canMark = isNearby && !isMarked;
-          // #region agent log
-          if (item === teachers[0]) fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'active-teachers.jsx:renderItem',message:'First teacher match',data:{apiSessionId, foundSessionIds, isNearby, canMark},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-          // #endregion
+          if (item === teachers[0])
+            fetch(DEBUG_LOG_INGEST, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                location: "active-teachers.jsx:renderItem",
+                message: "First teacher match",
+                data: { apiSessionId, foundSessionIds, isNearby, canMark },
+                timestamp: Date.now(),
+                sessionId: "debug-session",
+                hypothesisId: "H3",
+              }),
+            }).catch(() => {});
 
           return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.teacherName}>{item.teacher_name}</Text>
-                {isMarked && <Text style={styles.markedBadge}>✓ Marked</Text>}
+                <View>
+                  <Text style={styles.teacherName}>{item.teacher_name}</Text>
+                  <Text style={styles.sessionIdText}>ID: {item.session_id}</Text>
+                  <Text style={styles.scheduleText}>
+                    {item.day} • {item.start_time} - {item.end_time}
+                  </Text>
+                </View>
+                <View style={styles.statusBadges}>
+                  {isMarked && <Text style={styles.markedBadge}>✓ Marked</Text>}
+                  {isNearby && !isMarked && (
+                    <Text style={styles.nearbyBadge}>📡 Nearby</Text>
+                  )}
+                </View>
               </View>
-              
+
               <TouchableOpacity
                 style={[styles.button, !canMark && styles.disabled]}
                 disabled={!canMark}
                 onPress={() => markAttendance(item.session_id)}
               >
-                <Text style={[styles.buttonText, !canMark && styles.disabledText]}>
-                  {isMarked ? "Marked" : isNearby ? "Mark Attendance" : "Out of Range"}
+                <Text
+                  style={[
+                    styles.buttonText,
+                    !canMark && styles.disabledText,
+                  ]}
+                >
+                  {isMarked
+                    ? "✓ Already Marked"
+                    : isNearby
+                    ? "Mark Attendance (BLE)"
+                    : "Mark Attendance (Manual)"}
                 </Text>
               </TouchableOpacity>
             </View>
           );
         }}
-        ListEmptyComponent={<Text style={styles.emptyText}>No classes found</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No active classes found</Text>
+            <Text style={styles.emptySubtext}>
+              Ask your teacher to start attendance
+            </Text>
+          </View>
+        }
       />
+
+      {/* Manual Entry Modal */}
+      <Modal
+        visible={showManualEntry}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowManualEntry(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Session ID</Text>
+            <Text style={styles.modalSubtitle}>
+              Get the session code from your teacher
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 12345 or ABC123"
+              placeholderTextColor={COLORS.muted}
+              value={manualSessionId}
+              onChangeText={setManualSessionId}
+              autoCapitalize="characters"
+              autoFocus={true}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowManualEntry(false);
+                  setManualSessionId("");
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={markAttendanceManually}
+              >
+                <Text style={styles.submitButtonText}>Mark Attendance</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg, padding: 24 },
-  title: { color: COLORS.text, fontSize: 22, textAlign: "center", marginBottom: 16, fontWeight: "600" },
-  scan: { backgroundColor: COLORS.primary, padding: 14, borderRadius: 10, marginBottom: 16 },
+  title: {
+    color: COLORS.text,
+    fontSize: 22,
+    textAlign: "center",
+    marginBottom: 16,
+    fontWeight: "600",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    marginBottom: 16,
+    gap: 10,
+  },
+  scanButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    padding: 14,
+    borderRadius: 10,
+  },
   scanActive: { backgroundColor: COLORS.border },
   scanText: { color: "#000", textAlign: "center", fontWeight: "600" },
-  card: { backgroundColor: COLORS.card, padding: 16, borderRadius: 10, marginBottom: 12 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  teacherName: { color: COLORS.text, fontSize: 16, fontWeight: "600" },
-  markedBadge: { color: "#4CAF50", fontSize: 12, fontWeight: "600" },
+  manualButton: {
+    flex: 1,
+    backgroundColor: "#4CAF50",
+    padding: 14,
+    borderRadius: 10,
+  },
+  manualButtonText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  debugBox: {
+    backgroundColor: "#f0f0f0",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  debugText: {
+    color: "#666",
+    fontSize: 11,
+    textAlign: "center",
+    fontFamily: "monospace",
+  },
+  card: {
+    backgroundColor: COLORS.card,
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  teacherName: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  sessionIdText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontFamily: "monospace",
+    marginBottom: 2,
+  },
+  scheduleText: {
+    color: COLORS.muted,
+    fontSize: 11,
+  },
+  statusBadges: {
+    alignItems: "flex-end",
+  },
+  markedBadge: {
+    color: "#4CAF50",
+    fontSize: 12,
+    fontWeight: "600",
+    backgroundColor: "#e8f5e9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  nearbyBadge: {
+    color: "#2196F3",
+    fontSize: 11,
+    fontWeight: "600",
+    backgroundColor: "#e3f2fd",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
   button: { backgroundColor: COLORS.primary, padding: 12, borderRadius: 8 },
   disabled: { backgroundColor: COLORS.border },
   buttonText: { color: "#000", textAlign: "center", fontWeight: "600" },
   disabledText: { color: COLORS.muted },
-  emptyText: { color: COLORS.muted, textAlign: "center", marginTop: 32 },
+  emptyContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: COLORS.muted,
+    fontSize: 13,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: COLORS.muted,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  input: {
+    backgroundColor: COLORS.inputBg,
+    color: COLORS.text,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    fontSize: 16,
+    textAlign: "center",
+    fontFamily: "monospace",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: COLORS.border,
+    padding: 14,
+    borderRadius: 10,
+  },
+  cancelButtonText: {
+    color: COLORS.text,
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    padding: 14,
+    borderRadius: 10,
+  },
+  submitButtonText: {
+    color: "#000",
+    textAlign: "center",
+    fontWeight: "600",
+  },
 });

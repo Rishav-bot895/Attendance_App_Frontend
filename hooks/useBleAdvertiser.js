@@ -7,79 +7,184 @@ const SERVICE_UUID = "12345678-1234-1234-1234-123456789ABC";
 export function useBleAdvertiser() {
   const requestPermissions = async () => {
     if (Platform.OS === "android") {
-      if (Platform.Version >= 31) {
-        const result = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ]);
+      try {
+        if (Platform.Version >= 31) {
+          // Android 12+
+          const result = await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE,
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          ]);
 
-        const advertise = result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE];
-        const connect = result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT];
+          console.log("Permission results:", result);
 
-        if (advertise !== 'granted' || connect !== 'granted') {
-          Alert.alert("Permission Error", "Bluetooth permissions denied.");
-          return false;
+          const allGranted = Object.values(result).every(
+            (status) => status === PermissionsAndroid.RESULTS.GRANTED
+          );
+
+          if (!allGranted) {
+            Alert.alert(
+              "Permission Error",
+              "All Bluetooth permissions are required. Please enable them in Settings."
+            );
+            return false;
+          }
+        } else {
+          // Android 11 and below
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert("Permission Error", "Location permission is required.");
+            return false;
+          }
         }
-      } else {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert("Permission Error", "Location permission denied.");
-          return false;
-        }
+        return true;
+      } catch (error) {
+        console.error("Permission request error:", error);
+        return false;
       }
     }
     return true;
   };
 
-  // MODIFICATION: Accepts sessionId instead of username
   const startAdvertising = async (sessionId) => {
     try {
-      console.log("Starting BLE setup for Session:", sessionId);
+      console.log("=== Starting BLE Advertising ===");
+      console.log("Session ID:", sessionId);
+      console.log("Android Version:", Platform.Version);
 
+      // Step 1: Check permissions
       const hasPermissions = await requestPermissions();
-      if (!hasPermissions) return false;
+      if (!hasPermissions) {
+        console.log("❌ Permissions denied");
+        return false;
+      }
+      console.log("✅ Permissions granted");
 
-      // MODIFICATION: Convert Session ID to byte array
+      // Step 2: Check if BLE is supported
+      const isSupported = await BleAdvertiser.getAdapterState()
+        .then((result) => {
+          console.log("BLE Adapter State:", result);
+          return result === "STATE_ON";
+        })
+        .catch((error) => {
+          console.log("⚠️ Could not check adapter state:", error);
+          return true; // Assume it's on and try anyway
+        });
+
+      if (!isSupported) {
+        Alert.alert(
+          "Bluetooth Error",
+          "Please turn on Bluetooth and try again."
+        );
+        return false;
+      }
+
+      // Step 3: Prepare payload (keep it minimal)
       const idString = String(sessionId);
+      console.log("Session ID String:", idString, "Length:", idString.length);
+
+      // Convert to byte array
       const payload = [];
-      for (let i = 0; i < idString.length; i++) {
+      for (let i = 0; i < idString.length && i < 20; i++) {
+        // Limit to 20 bytes
         payload.push(idString.charCodeAt(i));
       }
-      // #region agent log
-      fetch(DEBUG_LOG_INGEST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBleAdvertiser.js:startAdvertising',message:'Advertiser payload',data:{sessionId, idString, payload},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
 
-      BleAdvertiser.setCompanyId(0x00E0); 
+      console.log("Payload bytes:", payload);
+      console.log("Payload length:", payload.length);
+
+      // Log to debug endpoint
+      fetch(DEBUG_LOG_INGEST, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: "useBleAdvertiser.js:startAdvertising",
+          message: "Starting advertisement",
+          data: {
+            sessionId,
+            idString,
+            payload,
+            payloadLength: payload.length,
+            androidVersion: Platform.Version,
+          },
+          timestamp: Date.now(),
+          sessionId: "debug-session",
+          hypothesisId: "H5",
+        }),
+      }).catch(() => {});
+
+      // Step 4: Set company ID
+      try {
+        BleAdvertiser.setCompanyId(0x00e0);
+        console.log("✅ Company ID set");
+      } catch (error) {
+        console.log("⚠️ Could not set company ID:", error);
+      }
+
+      // Step 5: Start broadcasting
+      console.log("Starting broadcast...");
       
       await BleAdvertiser.broadcast(SERVICE_UUID, payload, {
         advertiseMode: BleAdvertiser.ADVERTISE_MODE_LOW_LATENCY,
         txPowerLevel: BleAdvertiser.ADVERTISE_TX_POWER_HIGH,
         connectable: false,
-        // MODIFICATION: Turn off device name to save space
-        // This ensures we don't hit the 31-byte limit
-        includeDeviceName: false, 
+        includeDeviceName: false,
         includeTxPowerLevel: false,
       });
 
-      console.log("BLE advertising started successfully");
-      return true;
+      console.log("✅ BLE advertising started successfully");
+      
+      // Verify it's actually broadcasting
+      setTimeout(async () => {
+        try {
+          const state = await BleAdvertiser.getAdapterState();
+          console.log("Adapter state after broadcast:", state);
+        } catch (e) {
+          console.log("Could not verify adapter state:", e);
+        }
+      }, 1000);
 
+      return true;
     } catch (error) {
-      console.log("BLE Error:", error);
-      Alert.alert("BLE Error", error.message || "Failed to start advertising");
+      console.error("❌ BLE Advertising Error:", error);
+      console.error("Error stack:", error.stack);
+
+      // Log to debug endpoint
+      fetch(DEBUG_LOG_INGEST, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: "useBleAdvertiser.js:startAdvertising:error",
+          message: "Advertisement failed",
+          data: {
+            error: String(error),
+            errorMessage: error.message,
+            errorStack: error.stack,
+          },
+          timestamp: Date.now(),
+          sessionId: "debug-session",
+          hypothesisId: "H5",
+        }),
+      }).catch(() => {});
+
+      Alert.alert(
+        "BLE Error",
+        `Failed to start advertising: ${error.message || "Unknown error"}\n\nPlease try:\n1. Restart Bluetooth\n2. Restart the app\n3. Check Android version compatibility`
+      );
       return false;
     }
   };
 
   const stopAdvertising = async () => {
     try {
+      console.log("Stopping BLE advertising...");
       await BleAdvertiser.stopBroadcast();
-      console.log("BLE advertising stopped");
+      console.log("✅ BLE advertising stopped");
     } catch (error) {
-      console.log("BLE stop error:", error);
+      console.error("❌ BLE stop error:", error);
     }
   };
 
