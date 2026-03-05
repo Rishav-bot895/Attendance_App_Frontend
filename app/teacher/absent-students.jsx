@@ -8,14 +8,15 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useBleAdvertiser } from '../../hooks/useBleAdvertiser';
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { BASE_URL } from '../../constants/api';
 import { COLORS } from '../../constants/theme';
-import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
 
 export default function AbsentStudentsScreen() {
   const { activeSessionId, clearSession } = useAuth();
@@ -99,11 +100,11 @@ const downloadCSV = async () => {
     const csvText = await response.text();
 
     const fileUri =
-      FileSystem.documentDirectory +
+      FileSystem.cacheDirectory +
       `attendance_${activeSessionId}.csv`;
 
     await FileSystem.writeAsStringAsync(fileUri, csvText, {
-      encoding: FileSystem.EncodingType.UTF8,
+      encoding: 'utf8',
     });
 
     await Sharing.shareAsync(fileUri, {
