@@ -20,12 +20,12 @@ export default function AdminDashboard() {
       >
         <Text style={styles.buttonText}>Assign Schedule</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
-        style={[styles.button, styles.disabledButton]} 
-        activeOpacity={1} 
-        onPress={null}  
+        style={[styles.button, styles.deleteButton]}
+        onPress={() => router.push("/admin/delete-user")}
       >
-        <Text style={styles.disabledButtonText}>Delete User (Later)</Text>
+        <Text style={styles.deleteButtonText}>Delete User</Text>
       </TouchableOpacity>
     </View>
   );
@@ -53,6 +53,16 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#000",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  deleteButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: "#ef4444",
+  },
+  deleteButtonText: {
+    color: "#ef4444",
     fontWeight: "600",
     fontSize: 16,
   },
